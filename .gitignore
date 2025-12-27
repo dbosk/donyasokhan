@@ -1,0 +1,20 @@
+# Generated from literate programming (.nw files)
+donyasokhan.py
+donyasokhan.tex
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
+
+# Python
+__pycache__/
+*.pyc
+
+# Poetry
+.venv/
+
+# Downloaded files
+downloads/

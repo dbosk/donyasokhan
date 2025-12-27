@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "donyasokhan"
+version = "0.1.0"
+description = "Download magazine PDFs from donyayesokhan.com"
+authors = ["Daniel Bosk", "Dan-Claude"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.31"
+beautifulsoup4 = "^4.12"
+lxml = "^5.0"
+
+[tool.poetry.scripts]
+donyasokhan = "donyasokhan:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

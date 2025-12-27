@@ -1,0 +1,336 @@
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{noweb}
+\usepackage{hyperref}
+\usepackage{xepersian}
+\settextfont{Vazirmatn}
+
+\title{Donyaye Sokhan Magazine Downloader}
+\author{Daniel Bosk \and Dan-Claude}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+This program downloads PDF issues of the Donyaye Sokhan magazine from
+\url{https://donyayesokhan.com}. The website presents a paginated list of
+magazine issues, where each issue has its own page containing a download link
+to the PDF file.
+
+The program performs three main tasks:
+\begin{enumerate}
+\item Scrape all issue links from the paginated listing pages
+\item For each issue, extract the PDF download URL from its detail page
+\item Download each PDF to the current working directory
+\end{enumerate}
+
+We handle errors gracefully: if an individual download fails, we continue with
+the remaining issues and report all failures at the end. We also skip PDFs that
+already exist locally, making it safe to run the program multiple times.
+
+
+\section{Module Structure}
+
+We begin by presenting the overall structure of our module. This gives the
+reader a map of the program before diving into the details.
+
+<<[[donyasokhan.py]]>>=
+"""
+Download magazine PDFs from donyayesokhan.com
+"""
+<<imports>>
+<<constants>>
+<<scraping functions>>
+<<download function>>
+<<main function>>
+@
+
+\section{Dependencies}
+
+We use [[requests]] for HTTP operations and [[BeautifulSoup]] for parsing HTML.
+The [[lxml]] parser provides fast and robust HTML parsing. We also need
+[[urllib.parse]] to construct absolute URLs from relative paths found in the
+HTML, and [[pathlib]] for filesystem operations.
+
+<<imports>>=
+import sys
+from pathlib import Path
+from urllib.parse import urljoin, unquote
+
+import requests
+from bs4 import BeautifulSoup
+@
+
+
+\section{Configuration}
+
+We define the base URL and the listing page URL as constants. The listing page
+uses a [[sorting=position]] parameter to order issues chronologically.
+
+<<constants>>=
+BASE_URL = "https://donyayesokhan.com"
+LISTING_URL = f"{BASE_URL}/site/store/products?sorting=position"
+@
+
+We also set a user-agent string to identify our requests. Some websites block
+requests without a proper user-agent.
+
+<<constants>>=
+USER_AGENT = "DonyaSokhan-Downloader/1.0"
+HEADERS = {"User-Agent": USER_AGENT}
+@
+
+
+\section{Scraping the Issue List}
+
+The magazine listing is spread across multiple pages. We need to:
+\begin{enumerate}
+\item Parse each listing page to find issue links
+\item Detect and follow pagination links
+\end{enumerate}
+
+\subsection{Parsing a Single Listing Page}
+
+Each listing page contains product cards with links to individual issue pages.
+The links follow the pattern [[/number-{issue}]] (e.g., [[/number-10]]).
+
+<<scraping functions>>=
+def get_issue_links(page_url):
+    """
+    Parse a listing page and return URLs of individual issue pages.
+    """
+    response = requests.get(page_url, headers=HEADERS)
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "lxml")
+
+    links = []
+    for anchor in soup.find_all("a", href=True):
+        href = anchor["href"]
+        if href.startswith("/number-"):
+            full_url = urljoin(BASE_URL, href)
+            if full_url not in links:
+                links.append(full_url)
+
+    return links
+@
+
+\subsection{Handling Pagination}
+
+The listing has multiple pages, accessible via [[?page=N]] query parameter.
+We iterate through pages until we find one with no new issue links, indicating
+we've reached the end.
+
+<<scraping functions>>=
+def get_all_issue_links():
+    """
+    Collect all issue URLs from all listing pages.
+    """
+    all_links = []
+    page_num = 1
+
+    while True:
+        if page_num == 1:
+            page_url = LISTING_URL
+        else:
+            page_url = f"{LISTING_URL}&page={page_num}"
+
+        print(f"Fetching listing page {page_num}...", file=sys.stderr)
+
+        try:
+            links = get_issue_links(page_url)
+        except requests.RequestException as e:
+            print(f"Error fetching page {page_num}: {e}", file=sys.stderr)
+            break
+
+        if not links:
+            break
+
+        <<add new links and check for duplicates>>
+        page_num += 1
+
+    return all_links
+@
+
+When we encounter a page with only links we've already seen, we've reached the
+end of the listing.
+
+<<add new links and check for duplicates>>=
+new_links = [link for link in links if link not in all_links]
+if not new_links:
+    break
+all_links.extend(new_links)
+@
+
+
+\section{Extracting PDF URLs}
+
+Each issue page contains a download link to the PDF file. The link text is
+typically the Persian word for "download" (\rl{دانلود}), pointing to a path
+like [[uploads/شماره های مجله/دنیای سخن ۱۰.pdf]].
+
+<<scraping functions>>=
+def get_pdf_url(issue_url):
+    """
+    Parse an issue page and return the PDF download URL.
+
+    Returns None if no PDF link is found.
+    """
+    response = requests.get(issue_url, headers=HEADERS)
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "lxml")
+
+    for anchor in soup.find_all("a", href=True):
+        href = anchor["href"]
+        if href.endswith(".pdf"):
+            return urljoin(issue_url, href)
+
+    return None
+@
+
+
+\section{Downloading PDFs}
+
+The download function fetches a PDF and saves it to the specified directory.
+We extract the filename from the URL, handling URL-encoded Persian characters.
+
+<<download function>>=
+def download_pdf(pdf_url, dest_dir):
+    """
+    Download a PDF file to the destination directory.
+
+    Returns the path to the downloaded file, or None on failure.
+    Skips download if the file already exists.
+    """
+    filename = unquote(pdf_url.split("/")[-1])
+    dest_path = dest_dir / filename
+
+    <<skip if file exists>>
+    <<download and save file>>
+
+    return dest_path
+@
+
+We skip files that already exist, allowing the program to resume interrupted
+downloads or update an existing collection without re-downloading everything.
+
+<<skip if file exists>>=
+if dest_path.exists():
+    print(f"Skipping (exists): {filename}", file=sys.stderr)
+    return dest_path
+@
+
+For the actual download, we stream the response to handle large files without
+loading them entirely into memory.
+
+<<download and save file>>=
+print(f"Downloading: {filename}", file=sys.stderr)
+
+response = requests.get(pdf_url, headers=HEADERS, stream=True)
+response.raise_for_status()
+
+with open(dest_path, "wb") as f:
+    for chunk in response.iter_content(chunk_size=8192):
+        f.write(chunk)
+@
+
+
+\section{Main Function}
+
+The main function orchestrates the entire download process:
+\begin{enumerate}
+\item Collect all issue links from the paginated listing
+\item Extract PDF URLs from each issue page
+\item Download each PDF, tracking any failures
+\item Report results
+\end{enumerate}
+
+<<main function>>=
+def main():
+    """
+    Main entry point for the downloader.
+    """
+    dest_dir = Path.cwd()
+
+    <<collect all issue links>>
+    <<download all PDFs>>
+    <<report results>>
+@
+
+\subsection{Collecting Issue Links}
+
+We first gather all issue URLs from the paginated listing. If this fails
+entirely, we exit with an error.
+
+<<collect all issue links>>=
+print("Collecting issue links...", file=sys.stderr)
+issue_links = get_all_issue_links()
+
+if not issue_links:
+    print("No issues found!", file=sys.stderr)
+    sys.exit(1)
+
+print(f"Found {len(issue_links)} issues", file=sys.stderr)
+@
+
+\subsection{Downloading PDFs}
+
+For each issue, we extract the PDF URL and download it. We track failures
+separately so we can continue with other issues and report all failures at the
+end.
+
+<<download all PDFs>>=
+downloaded = []
+failed = []
+
+for i, issue_url in enumerate(issue_links, 1):
+    print(f"\n[{i}/{len(issue_links)}] Processing {issue_url}",
+          file=sys.stderr)
+
+    try:
+        pdf_url = get_pdf_url(issue_url)
+        if not pdf_url:
+            print(f"  No PDF link found", file=sys.stderr)
+            failed.append((issue_url, "No PDF link found"))
+            continue
+
+        result = download_pdf(pdf_url, dest_dir)
+        if result:
+            downloaded.append(result)
+    except requests.RequestException as e:
+        print(f"  Error: {e}", file=sys.stderr)
+        failed.append((issue_url, str(e)))
+@
+
+\subsection{Reporting Results}
+
+Finally, we report what was downloaded and what failed.
+
+<<report results>>=
+print(f"\n{'='*50}", file=sys.stderr)
+print(f"Downloaded: {len(downloaded)} PDFs", file=sys.stderr)
+print(f"Failed: {len(failed)}", file=sys.stderr)
+
+if failed:
+    print("\nFailed downloads:", file=sys.stderr)
+    for url, error in failed:
+        print(f"  {url}: {error}", file=sys.stderr)
+    sys.exit(1)
+@
+
+
+\section{Running the Program}
+
+This allows the module to be run directly with [[python donyasokhan.py]] or
+through Poetry's script entry point [[poetry run donyasokhan]].
+
+<<main function>>=
+if __name__ == "__main__":
+    main()
+@
+
+\end{document}
