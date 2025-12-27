@@ -24,8 +24,11 @@ The program performs three main tasks:
 \begin{enumerate}
 \item Scrape all issue links from the paginated listing pages
 \item For each issue, extract the PDF download URL from its detail page
-\item Download each PDF to the current working directory
+\item Download each PDF to the specified output directory
 \end{enumerate}
+
+The output directory can be specified via the [[-o]] or [[--output-dir]] flag;
+it defaults to the current working directory.
 
 We handle errors gracefully: if an individual download fails, we continue with
 the remaining issues and report all failures at the end. We also skip PDFs that
@@ -45,6 +48,7 @@ Download magazine PDFs from donyayesokhan.com
 <<constants>>
 <<scraping functions>>
 <<download function>>
+<<cli argument parser>>
 <<main function>>
 @
 
@@ -56,6 +60,7 @@ The [[lxml]] parser provides fast and robust HTML parsing. We also need
 HTML, and [[pathlib]] for filesystem operations.
 
 <<imports>>=
+import argparse
 import sys
 from pathlib import Path
 from urllib.parse import urljoin, unquote
@@ -239,10 +244,34 @@ with open(dest_path, "wb") as f:
 @
 
 
+\section{Command-Line Interface}
+
+We use [[argparse]] to handle command-line arguments. The [[-o]] or
+[[--output-dir]] flag specifies where to save the downloaded PDFs.
+
+<<cli argument parser>>=
+def parse_args():
+    """
+    Parse command-line arguments.
+    """
+    parser = argparse.ArgumentParser(
+        description="Download magazine PDFs from donyayesokhan.com"
+    )
+    parser.add_argument(
+        "-o", "--output-dir",
+        type=Path,
+        default=Path.cwd(),
+        help="Directory to save PDFs (default: current directory)"
+    )
+    return parser.parse_args()
+@
+
+
 \section{Main Function}
 
 The main function orchestrates the entire download process:
 \begin{enumerate}
+\item Parse command-line arguments
 \item Collect all issue links from the paginated listing
 \item Extract PDF URLs from each issue page
 \item Download each PDF, tracking any failures
@@ -254,11 +283,19 @@ def main():
     """
     Main entry point for the downloader.
     """
-    dest_dir = Path.cwd()
+    args = parse_args()
+    dest_dir = args.output_dir
 
+    <<ensure output directory exists>>
     <<collect all issue links>>
     <<download all PDFs>>
     <<report results>>
+@
+
+We create the output directory if it doesn't exist.
+
+<<ensure output directory exists>>=
+dest_dir.mkdir(parents=True, exist_ok=True)
 @
 
 \subsection{Collecting Issue Links}
