@@ -1,6 +1,7 @@
 \documentclass[a4paper]{article}
 \usepackage{noweb}
 \usepackage{hyperref}
+\usepackage{fancyvrb}
 \usepackage{polyglossia}
 \setmainlanguage{english}
 \setotherlanguage{persian}
@@ -369,5 +370,12 @@ through Poetry's script entry point [[poetry run donyasokhan]].
 if __name__ == "__main__":
     main()
 @
+
+
+\section{License}
+
+This project is licensed under the MIT License.
+
+\VerbatimInput{LICENSE}
 
 \end{document}
