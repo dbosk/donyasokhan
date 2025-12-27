@@ -102,7 +102,8 @@ The magazine listing is spread across multiple pages. We need to:
 \subsection{Parsing a Single Listing Page}
 
 Each listing page contains product cards with links to individual issue pages.
-The links follow the pattern [[/number-{issue}]] (e.g., [[/number-10]]).
+The links follow two patterns: [[/number-{issue}]] for older issues (10--49) and
+[[/product-{id}]] for newer issues (50+).
 
 <<scraping functions>>=
 def get_issue_links(page_url):
@@ -117,7 +118,7 @@ def get_issue_links(page_url):
     links = []
     for anchor in soup.find_all("a", href=True):
         href = anchor["href"]
-        if href.startswith("/number-"):
+        if href.startswith("/number-") or href.startswith("/product-"):
             full_url = urljoin(BASE_URL, href)
             if full_url not in links:
                 links.append(full_url)
