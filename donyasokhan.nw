@@ -1,10 +1,10 @@
 \documentclass[a4paper]{article}
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
 \usepackage{noweb}
 \usepackage{hyperref}
-\usepackage{xepersian}
-\settextfont{Vazirmatn}
+\usepackage{polyglossia}
+\setmainlanguage{english}
+\setotherlanguage{persian}
+\newfontfamily\persianfont{Vazirmatn}
 
 \title{Donyaye Sokhan Magazine Downloader}
 \author{Daniel Bosk \and Dan-Claude}
@@ -174,7 +174,7 @@ all_links.extend(new_links)
 \section{Extracting PDF URLs}
 
 Each issue page contains a download link to the PDF file. The link text is
-typically the Persian word for "download" (\rl{دانلود}), pointing to a path
+typically the Persian word for "download" (\textpersian{دانلود}), pointing to a path
 like [[uploads/شماره های مجله/دنیای سخن ۱۰.pdf]].
 
 <<scraping functions>>=
