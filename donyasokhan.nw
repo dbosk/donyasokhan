@@ -1,6 +1,6 @@
 \documentclass[a4paper]{article}
 \usepackage{noweb}
-\usepackage{hyperref}
+\usepackage[colorlinks]{hyperref}
 \usepackage{fancyvrb}
 \usepackage{polyglossia}
 \setmainlanguage{english}
@@ -8,8 +8,8 @@
 \newfontfamily\persianfont{Vazirmatn}
 
 \title{Donyaye Sokhan Magazine Downloader}
-\author{Daniel Bosk \and Dan-Claude}
-\date{}
+\author{Daniel Bosk \and Dan-Claude Opus van Thropic}
+\date{2025-12-27}
 
 \begin{document}
 \maketitle
